@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>冒険クイズ × キャラコレクション（一本道）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --ink:#222; --muted:#667; --brand:#4e6cf4; --ok:#2aa776; --warn:#e6a100; --danger:#d33;
+    --path:#e9ecff; --path-line:#c9d0ff; --hero:#4e6cf4; --treasure:#f2c94c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;background:var(--bg);color:var(--ink)}
+  header{padding:14px 18px;background:var(--card);box-shadow:0 2px 12px rgba(0,0,0,.06);position:sticky;top:0;z-index:20}
+  h1{font-size:20px;margin:0}
+  .wrap{max-width:1100px;margin:18px auto;padding:0 16px}
+  .row{display:flex;flex-wrap:wrap;gap:12px}
+  .card{background:var(--card);border-radius:16px;box-shadow:0 4px 18px rgba(0,0,0,.06);padding:16px}
+  .login,.controls,.quiz,.collection,.teacher,.adventure{width:100%}
+  input[type="text"],select{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:16px;background:#fff}
+  button{cursor:pointer;border:none;border-radius:12px;padding:10px 14px;font-weight:700}
+  .btn{background:var(--brand);color:#fff}
+  .btn.secondary{background:#e6e8ff;color:#2b2f7e}
+  .btn.ghost{background:#eef0f7;color:#2b2f7e}
+  .btn.warn{background:#fff3e1;color:#6b4b00;border:1px solid #ffe1a8}
+  .muted{color:var(--muted)}
+  .small{font-size:12px}
+  .right{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+
+  /* Quiz */
+  .quiz h2{margin:0 0 8px}
+  .options{display:grid;gap:10px;margin-top:12px}
+  .opt{padding:12px;border:2px solid #e7e7ee;border-radius:12px;background:#fff;text-align:left}
+  .opt.correct{border-color:var(--ok)}
+  .opt.wrong{border-color:var(--danger)}
+  .result-area{margin-top:12px}
+  .progressbar{height:10px;background:#eef0f7;border-radius:999px;overflow:hidden}
+  .progressbar > span{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#67d6a7)}
+
+  /* Adventure path */
+  .adventure{position:relative;overflow:hidden}
+  .path-wrap{background:linear-gradient(180deg,#fdfdff, #f6f7fb);border-radius:14px;padding:16px;border:1px solid #eef0ff}
+  .path{display:grid;grid-template-columns:repeat(auto-fit,minmax(24px,1fr));gap:8px;align-items:center}
+  .node{position:relative;height:26px;background:var(--path);border:1px solid var(--path-line);border-radius:999px}
+  .node.done{background:#dff6ea;border-color:#b7ebd1}
+  .node .label{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:10px;color:#889}
+  .node.treasure::after{content:"🎁";position:absolute;right:-6px;top:-16px;font-size:16px}
+  .hero{position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:var(--hero);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;box-shadow:0 6px 16px rgba(78,108,244,.35);transition:left .8s cubic-bezier(.2,.7,.2,1)}
+  .hero::after{content:"🧭";filter:drop-shadow(0 2px 2px rgba(0,0,0,.12))}
+
+  /* Split layout */
+  .split{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+  @media (max-width:900px){.split{grid-template-columns:1fr}}
+
+  /* Treasure modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,16,32,.55);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#101735;color:#e6ecff;border:1px solid #3041a7;border-radius:16px;padding:18px;max-width:520px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .modal h3{margin:0 0 6px}
+  .modal p{margin:0 0 10px;color:#b7c0ff}
+  .modal img{max-width:240px;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.35);background:#0c1126}
+  .modal .chest{font-size:48px;animation:pop .6s ease both}
+  @keyframes pop{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
+
+  /* Collection */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+  .grid img{width:100%;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+  .pill{padding:6px 10px;border-radius:999px;background:#eef0f7;font-size:12px}
+  .badge{background:#fff3c2;color:#6b4b00;border:1px solid #ffe28a}
+
+  /* Footer mini help */
+  footer{padding:20px;color:#98a; font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap row" style="align-items:center;justify-content:space-between;">
+    <h1>冒険クイズ × キャラコレ（一本道）</h1>
+    <div class="right">
+      <button class="btn ghost" id="teacherBtn">教師モード</button>
+      <button class="btn secondary" id="showCollectionBtn">コレクション</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Login -->
+  <section class="card login" id="loginCard">
+    <h2 style="margin:0 0 8px">冒険に出る（ログイン）</h2>
+    <p class="muted small">ニックネームでOK。同じ名前で続きから再開できます。</p>
+    <div class="row">
+      <div style="flex:1"><input id="nickname" type="text" placeholder="ニックネームを入力" /></div>
+      <div style="flex:0 0 auto"><button class="btn" id="loginBtn">はじめる</button></div>
+    </div>
+  </section>
+
+  <!-- Adventure Path -->
+  <section class="card adventure" id="adventureCard" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="pill">🧑‍🚀 冒険者：<b id="currentUserLabel">-</b></div>
+      <div class="pill badge">小単元を<span style="font-weight:700">全問正解</span>で宝箱オープン！</div>
+      <div class="pill">踏破：<span id="clearedCount">0</span>/<span id="totalSubunits">0</span></div>
+    </div>
+    <div class="path-wrap">
+      <div id="path" class="path"></div>
+      <div id="hero" class="hero" style="left:0%"></div>
+    </div>
+  </section>
+
+  <div class="split">
+    <!-- Quiz -->
+    <section class="card quiz" id="quizCard" style="display:none">
+      <h2 id="subunitTitle">-</h2>
+      <div class="muted small" id="qCounter">1 / 5</div>
+      <div id="questionText" style="margin-top:8px;font-size:18px;font-weight:600"></div>
+      <div id="options" class="options"></div>
+      <div id="feedback" class="result-area"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:space-between">
+        <div class="row" style="gap:8px">
+          <button class="btn ghost" id="prevQ">← 前の問題</button>
+          <button class="btn" id="nextQ">次の問題 →</button>
+        </div>
+        <div style="min-width:220px">
+          <div class="progressbar"><span id="progressBar" style="width:0%"></span></div>
+          <div class="muted small" style="margin-top:6px">小単元クリア状況：<span id="progressText">0/0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collection -->
+    <section class="card collection" id="collectionCard" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <h2 style="margin:0">コレクション</h2>
+        <button class="btn ghost" id="hideCollectionBtn">閉じる</button>
+      </div>
+      <p class="muted small">宝箱から出てきた仲間たち。コンプリートを目指そう！（被りあり）</p>
+      <div id="collectionGrid" class="grid"></div>
+    </section>
+  </div>
+
+  <!-- Teacher -->
+  <section class="card teacher" id="teacherCard" style="display:none">
+    <h2 style="margin:0 0 8px">教師モード</h2>
+    <div class="row">
+      <button class="btn ghost" id="switchUserBtn">ユーザー切替</button>
+      <button class="btn" id="exportBtn">進捗をJSONエクスポート</button>
+      <button class="btn warn" id="wipeBtn">このユーザーの全データ削除</button>
+    </div>
+    <pre id="exportBox" style="margin-top:12px;white-space:pre-wrap;word-break:break-all;background:#0b1020;color:#e6ecff;border-radius:12px;padding:12px;display:none"></pre>
+  </section>
+</div>
+
+<!-- Treasure Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="chest" id="chestEmoji">🧰</div>
+    <h3 id="modalTitle">宝箱が開いた！</h3>
+    <p id="modalMessage">新しいキャラクターをゲット！</p>
+    <img id="rewardImg" alt="new character" />
+    <div style="margin-top:12px">
+      <button class="btn secondary" id="closeModalBtn">とじる</button>
+    </div>
+  </div>
+</div>
+
+<footer class="wrap">
+  ヒント：単元と小単元を選んで全問正解を目指そう。小単元をクリアすると道が1マス進み、宝箱からキャラが出るよ！
+</footer>
+
+<script>
+/* ================= キャラ画像（Google Drive埋め込みiframeリンク） ================ */
+const allCharacters = [
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%81%82%E3%81%84%E3%81%95%E3%81%A4.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%A2%E3%82%B7%E3%83%9E%E3%83%AA01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%A4%E3%83%BC%E3%83%95%E3%82%99%E3%82%A4.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%AB%E3%82%A4%E3%83%AA%E3%83%A5%E3%83%BC01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%AB%E3%83%92%E3%82%99%E3%82%B3%E3%82%99%E3%83%B3.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B1%E3%82%99%E3%83%B3%E3%82%AB%E3%82%99%E3%83%BC.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B3%E3%82%A4%E3%82%AD%E3%83%B3%E3%82%AF%E3%82%9901.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B3%E3%82%BF%E3%82%99%E3%83%83%E3%82%AF.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B5%E3%83%AB%E3%83%8E%E3%83%AA01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B5%E3%83%B3%E3%82%BF%E3%82%99%E3%83%BC%E3%82%B9.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%B7%E3%83%A3%E3%83%AF%E3%83%BC%E3%82%B9%E3%82%9901.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%BB%E3%82%99%E3%83%8B%E3%82%AB%E3%82%99%E3%83%A1.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%82%BD%E3%83%BC%E3%83%8A%E3%83%B3%E3%82%B901.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%81%E3%82%A7%E3%83%AA%E3%83%A001.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%8A%E3%82%A8%E3%83%88%E3%83%AB.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%8B%E3%83%A3%E3%83%92%E3%82%99%E3%83%BC01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%8B%E3%83%A3%E3%83%BC%E3%82%B901.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%82%AB%E3%83%81%E3%83%A5%E3%82%A6.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%82%AB%E3%83%81%E3%83%A5%E3%82%A6_%E7%A9%8D%E3%81%BF%E6%9C%A8.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%82%AB%E3%83%81%E3%83%A5%E3%82%A6_%E9%9B%AA%E3%81%9F%E3%82%99%E3%82%8B%E3%81%BE.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%82%AB%E3%83%81%E3%83%A5%E3%82%A6_%E9%A3%9F%E4%BA%8B%E4%B8%AD.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%82%AB%E3%83%81%E3%83%A5%E3%82%A6%EF%BC%86%E3%83%92%E3%82%9A%E3%83%81%E3%83%A5%E3%83%BC.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%9A%E3%83%81%E3%83%A5%E3%83%BC01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%82%B3%E3%82%B5%E3%82%99%E3%83%AB.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%83%88%E3%82%AB%E3%82%B1%E3%82%99.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%92%E3%83%8E%E3%82%A2%E3%83%A9%E3%82%B7.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%95%E3%82%B7%E3%82%AD%E3%82%99%E3%82%BF%E3%82%99%E3%83%8D.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%9B%E3%82%9A%E3%83%83%E3%83%81%E3%83%A3%E3%83%9E.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%9F%E3%83%A5%E3%82%A6.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%9F%E3%83%A5%E3%82%A6%E3%83%84%E3%83%BC.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A1%E3%82%BF%E3%83%A2%E3%83%B3.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A1%E3%83%83%E3%82%BD%E3%83%B301.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A2%E3%82%AF%E3%83%AD%E3%83%BC01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A4%E3%83%88%E3%82%99%E3%83%B301.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A9%E3%82%A4%E3%83%81%E3%83%A5%E3%82%A601.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A9%E3%83%83%E3%82%AD%E3%83%BC01.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%A9%E3%83%95%E3%82%9A%E3%83%A9%E3%82%B901.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%AA%E3%82%B5%E3%82%99%E3%83%BC%E3%83%88%E3%82%99%E3%83%B3.png",
+  "https://raw.githubusercontent.com/knoriaki1995-star/20256/refs/heads/main/%E3%83%AD%E3%82%B3%E3%83%B301.png",
+];
+
+/* ================= 問題データ（全小単元） ================ */
+const units = {
+  "1-1 線対称": [
+    { q: "線対称の図形で、正方形の対称の軸は何本ありますか？", options: ["1","2","3","4"], answer: 4 },
+    { q: "線対称な図形はどれですか？", options: ["S","D","A","F"], answer: 3 },
+    { q: "線対称の図形でないものはどれですか？", options: ["円","二等辺三角形","長方形","台形"], answer: 4 },
+    { q: "ひし形の対称の軸は何本ですか？", options: ["1","2","3","4"], answer: 2 },
+    { q: "線対称の図形は鏡に映すとどうなりますか？", options: ["同じ形になる","形が変わる","反転して違う形になる","大きくなる"], answer: 1 }
+  ],
+  "1-2 点対称": [
+    { q: "点対称な図形はどれですか？", options: ["正方形","円","長方形","ひし形"], answer: 4 },
+    { q: "アルファベットで点対称な文字はどれですか？", options: ["A","B","C","H"], answer: 4 },
+    { q: "点対称な図形は、180度回転させるとどうなりますか？", options: ["同じ形になる","逆さまになるが形は同じ","全く違う形になる","大きくなる"], answer: 2 },
+    { q: "点対称でない図形はどれですか？", options: ["円","五角形","長方形","正三角形"], answer: 4 },
+    { q: "正六角形は点対称ですか？", options: ["はい","いいえ","場合による","わからない"], answer: 1 }
+  ],
+  "2-1 文字を使った式の表し方": [
+    { q: "x個のリンゴがあり、1個100円なら代金は？", options: ["100x","x+100","100+x","x-100"], answer: 1 },
+    { q: "縦xcm、横ycmの長方形の面積は？", options: ["x+y","xy","x-y","2x+2y"], answer: 2 },
+    { q: "1個a円のお菓子をb個買う代金は？", options: ["a+b","a-b","ab","a/b"], answer: 3 },
+    { q: "m分を秒にすると？", options: ["60m","m/60","m+60","m-60"], answer: 1 },
+    { q: "縦x、横yの長方形の周の長さは？", options: ["x+y","2x+2y","xy","x-y"], answer: 2 }
+  ],
+  "2-2 文字を使った式の計算": [
+    { q: "3x+5xは？", options: ["8x","15x","x^8","2x"], answer: 1 },
+    { q: "7x-2xは？", options: ["-5x","5x","x","7x"], answer: 2 },
+    { q: "2x-1xは？", options: ["2x","x","3x","x/2"], answer: 2 },
+    { q: "4x+2は？", options: ["4x+2","x","8x","6x"], answer: 1 },
+    { q: "5x+3yはこれ以上簡単にできる？", options: ["できる","できない","場合による","わからない"], answer: 2 }
+  ],
+  "3-1 分数×整数": [
+    { q: "3/4×8は？", options: ["6","8","9","10"], answer: 1 },
+    { q: "2/5×10は？", options: ["2","4","6","8"], answer: 2 },
+    { q: "7/8×16は？", options: ["10","12","14","16"], answer: 3 },
+    { q: "5/6×12は？", options: ["4","6","8","10"], answer: 4 },
+    { q: "4/9×27は？", options: ["10","12","14","16"], answer: 2 }
+  ],
+  "3-2 分数÷整数": [
+    { q: "3/4÷2は？", options: ["3/8","3/6","3/2","6/4"], answer: 1 },
+    { q: "5/6÷5は？", options: ["1/6","5/30","5/11","6/5"], answer: 1 },
+    { q: "7/8÷7は？", options: ["1/8","7/15","1/16","15/7"], answer: 3 },
+    { q: "2/3÷4は？", options: ["2/12","1/6","2/7","3/8"], answer: 2 },
+    { q: "9/10÷3は？", options: ["10/27","3/13","1/3","3/10"], answer: 4 }
+  ],
+  "3-3 分数×分数": [
+    { q: "2/3×3/4は？", options: ["1/2","2/7","3/8","1/3"], answer: 1 },
+    { q: "5/6×2/5は？", options: ["1/6","2/3","5/12","1/3"], answer: 4 },
+    { q: "7/8×4/7は？", options: ["4/8","1/2","1/3","2/7"], answer: 2 },
+    { q: "3/5×5/9は？", options: ["5/15","1/2","1/3","3/14"], answer: 3 },
+    { q: "4/7×14/5は？", options: ["8/5","4/5","2/7","7/8"], answer: 1 }
+  ],
+  "4-1 分数÷分数": [
+    { q: "2/3÷4/5は？", options: ["5/3","6/5","3/5","5/6"], answer: 4 },
+    { q: "3/4÷2/7は？", options: ["7/8","8/21","21/8","3/14"], answer: 3 },
+    { q: "5/6÷5/12は？", options: ["1/2","2","5/10","12/5"], answer: 2 },
+    { q: "7/8÷1/4は？", options: ["7/2","8/7","7/32","1/2"], answer: 1 },
+    { q: "9/10÷3/5は？", options: ["3/2","2/3","5/6","10/27"], answer: 1 }
+  ],
+  "4-2 分数の倍": [
+    { q: "3/4の2倍は？", options: ["1/2","6/4","3/2","4/3"], answer: 3 },
+    { q: "5/6の3倍は？", options: ["6/5","5/2","3/5","15/6"], answer: 4 },
+    { q: "2/5の4倍は？", options: ["8/5","5/8","4/5","2/8"], answer: 1 },
+    { q: "7/8の0.5倍は？", options: ["14/8","16/7","1/2","7/16"], answer: 4 },
+    { q: "9/10の1.5倍は？", options: ["27/20","20/27","3/5","5/3"], answer: 1 }
+  ],
+  "5-1 比の意味": [
+    { q: "3:4は次のどれと等しいですか？", options: ["4:5","6:8","9:10","12:13"], answer: 2 },
+    { q: "2:5と等しい比は？", options: ["4:10","5:12","3:5","7:9"], answer: 1 },
+    { q: "5:8と等しい比は？", options: ["10:16","8:13","15:24","1:2"], answer: 1 },
+    { q: "1:3と等しい比は？", options: ["2:6","3:9","4:12","全部"], answer: 4 },
+    { q: "6:9を簡単にすると？", options: ["3:4","2:3","4:5","3:5"], answer: 2 }
+  ],
+  "5-2 比の値の計算": [
+    { q: "8:12の値は？", options: ["4/6","3/2","2/3","6/4"], answer: 3 },
+    { q: "5:20の値は？", options: ["5","4","1/4","20"], answer: 3 },
+    { q: "9:15の値は？", options: ["5/3","3/5","2/3","1/2"], answer: 2 },
+    { q: "7:14の値は？", options: ["14/7","2","7/14","1/2"], answer: 4 },
+    { q: "12:18の値は？", options: ["6/4","3/2","4/6","2/3"], answer: 4 }
+  ],
+  "5-3 比の利用": [
+    { q: "3:5の比で8個のボールを分けます。少ない方は何個ですか？", options: ["3","4","5","8"], answer: 2 },
+    { q: "2:3の比で20個の飴を分けます。多い方は何個ですか？", options: ["8","10","12","15"], answer: 3 },
+    { q: "4:1の比で10Lのジュースを分けます。少ない方は何Lですか？", options: ["2","4","6","8"], answer: 1 },
+    { q: "5:7の比で24mのリボンを分けます。多い方は何mですか？", options: ["10","12","14","16"], answer: 3 },
+    { q: "1:4の比で25枚のカードを分けます。多い方は何枚ですか？", options: ["4","5","20","25"], answer: 3 }
+  ],
+  "6-1 拡大図": [
+    { q: "長さ4cmの線分を、2倍に拡大すると長さは何cmになりますか？", options: ["6","8","10","12"], answer: 2 },
+    { q: "三角形の各辺の長さが2cm, 3cm, 4cmのとき、1.5倍に拡大した三角形の最も長い辺は何cmですか？", options: ["5","5.5","6","6.5"], answer: 3 },
+    { q: "正方形の一辺が5cmの図形を、3倍に拡大したときの一辺の長さは何cmですか？", options: ["10","12","15","20"], answer: 3 },
+    { q: "半径3cmの円を2倍に拡大したときの半径は何cmですか？", options: ["5","6","7","8"], answer: 4 },
+    { q: "長さ9cmの線分を、0.5倍に縮小すると長さは何cmになりますか？", options: ["4.5","5","6","7"], answer: 1 }
+  ],
+  "6-2 縮図": [
+    { q: "実際の長さ20mを、1/100の縮尺で表すと何cmになりますか？", options: ["20","200","2","0.2"], answer: 2 },
+    { q: "地図上で5cmの距離が、実際には1kmのときの縮尺はどれですか？", options: ["1/20000","1/50000","1/10000","1/25000"], answer: 2 },
+    { q: "実際の距離300mを、1/500の縮尺で表すと図上では何cmになりますか？", options: ["60","6","0.6","600"], answer: 1 },
+    { q: "地図上で12cmの距離が、実際には480mであるとき、縮尺はどれですか？", options: ["1/40","1/400","1/4000","1/4800"], answer: 3 },
+    { q: "実際の長さ8mを1/200の縮尺で描くと、図の長さは何cmになりますか？", options: ["40","4","0.4","400"], answer: 4 }
+  ],
+  "7-1平均値と中央値": [
+    { q: "5, 8, 10 の平均値は？", options: ["7","8","9","10"], answer: 1 },
+    { q: "3, 5, 7 の中央値は？", options: ["3","5","7","6"], answer: 2 },
+    { q: "4, 6, 8, 10 の平均値は？", options: ["7","8","6","9"], answer: 1 },
+    { q: "1, 3, 5, 7, 9 の中央値は？", options: ["3","5","7","4"], answer: 2 },
+    { q: "2, 4, 6, 8 の中央値は？", options: ["4","5","6","7"], answer: 2 }
+  ],
+  "7-2度数分布表と柱状グラフ": [
+    { q: "度数分布表で最も多い区間を何と呼ぶ？", options: ["平均","最頻値","中央値","範囲"], answer: 2 },
+    { q: "柱状グラフはどんなデータに向いている？", options: ["時間の変化","割合の比較","数値の分布","位置の変化"], answer: 3 },
+    { q: "度数分布表で階級の幅が大きいほど？", options: ["細かく見える","大まかになる","変わらない","不明"], answer: 2 },
+    { q: "柱状グラフの縦軸は何を表す？", options: ["度数","割合","時間","階級"], answer: 1 },
+    { q: "帯グラフは何を表すのに便利？", options: ["順序","割合","位置","時間"], answer: 4 }
+  ],
+  "7-3折れ線グラフと帯グラフ": [
+    { q: "折れ線グラフは何を表す？", options: ["分布","割合の比較","時間の変化","順序"], answer: 3 },
+    { q: "帯グラフの全体の長さは何を表す？", options: ["100%","合計","最大値","中央値"], answer: 1 },
+    { q: "折れ線グラフで点を結ぶ線は何を示す？", options: ["割合","変化の様子","平均","範囲"], answer: 2 },
+    { q: "帯グラフで色分けされている部分は何を表す？", options: ["時間の変化","項目別の割合","平均","階級"], answer: 2 },
+    { q: "折れ線グラフと柱状グラフを組み合わせたものは？", options: ["ヒストグラム","帯グラフ","散布図","複合グラフ"], answer: 4 }
+  ],
+  "8-1円の面積の求め方": [
+    { q: "半径5cmの円の面積は？", options: ["31.4","78.5","25","62.8"], answer: 2 },
+    { q: "半径10cmの円の面積は？", options: ["157","314","100","62.8"], answer: 2 },
+    { q: "直径8cmの円の半径は？", options: ["16","8","4","2"], answer: 3 },
+    { q: "円の面積の公式は？", options: ["半径×3.14","直径×直径×3.14","直径×3.14","半径×半径×3.14"], answer: 4 },
+    { q: "半径3cmの円の面積は？", options: ["28.26","18.84","9","31.4"], answer: 1 }
+  ],
+  "8-2半円・扇形の面積": [
+    { q: "半径6cmの半円の面積は？", options: ["56.52","113.04","18.84","28.26"], answer: 1 },
+    { q: "半径4cm、中心角90°の扇形の面積は？", options: ["12.56","25.12","50.24","6.28"], answer: 1 },
+    { q: "半径5cm、中心角180°の扇形は何の形の半分？", options: ["円","長方形","三角形","楕円"], answer: 1 },
+    { q: "半円の面積を求めるには円の面積をどうする？", options: ["2倍","半分","3倍","4倍"], answer: 2 },
+  ],
+  "9-1角柱の体積": [
+    { q: "底面積20cm²、高さ5cmの角柱の体積は？", options: ["10","25","200","100"], answer: 4 },
+    { q: "底面が長方形の角柱の体積は底面積×何？", options: ["底辺","高さ","幅","奥行き"], answer: 2 },
+    { q: "底面積50cm²、高さ2cmの角柱の体積は？", options: ["150","25","100","200"], answer: 3 },
+    { q: "体積の単位は？", options: ["cm²","cm³","cm","m"], answer: 2 },
+    { q: "底面積10cm²、高さ10cmの角柱の体積は？", options: ["100","10","1","1000"], answer: 1 }
+  ],
+  "9-2円柱の体積": [
+    { q: "底面積30cm²、高さ5cmの円柱の体積は？", options: ["15","35","300","150"], answer: 4 },
+    { q: "円柱の体積の公式は？", options: ["底面積×高さ","半径×半径×3.14","直径×高さ","高さ×周の長さ"], answer: 1 },
+    { q: "半径3cm、高さ10cmの円柱の体積は？(π=3.14)", options: ["282.6","94.2","188.4","565.2"], answer: 1 },
+    { q: "体積の単位は？", options: ["cm²","cm³","cm","m²"], answer: 2 },
+    { q: "底面積15cm²、高さ4cmの円柱の体積は？", options: ["60","45","30","75"], answer: 1 }
+  ],
+  "10-1面積のおよその値": [
+    { q: "長方形の面積をおよそ求めるとき、1辺が2.9mなら何mとして計算する？", options: ["2m","1m","4m","3m"], answer: 4 },
+    { q: "半径3.2cmの円の面積をおよそ求めるには半径を何cmとする？", options: ["2cm","3.5cm","4cm","3cm"], answer: 4 },
+    { q: "1.48mをおよその値にすると？", options: ["1m","1.5m","2m","1.4m"], answer: 2 },
+    { q: "1.76mを四捨五入して整数にすると？", options: ["1m","2m","3m","1.5m"], answer: 2 },
+    { q: "3.14をおよそ3とするのはどんなとき？", options: ["面積を出すとき","正確な計算のとき","概算のとき","誤差を出すとき"], answer: 3 }
+  ],
+  "10-2体積のおよその値": [
+    { q: "高さが4.9mの円柱の体積をおよそ求めるとき、高さを何mとする？", options: ["4m","4.5m","6m","5m"], answer: 4 },
+    { q: "半径2.6mの円柱の体積をおよそ求めるとき、半径を何mとする？", options: ["2m","3m","2.5m","2.8m"], answer: 2 },
+    { q: "6.4mを四捨五入して整数にすると？", options: ["6m","7m","5m","8m"], answer: 2 },
+    { q: "3.2mをおよその値にすると？", options: ["3.5m","4m","2m","3m"], answer: 4 },
+    { q: "体積の概算をする理由は？", options: ["計算を簡単にするため","正確にするため","測定のため","実験のため"], answer: 1 }
+  ],
+  "11-1比例の意味とグラフ": [
+    { q: "比例の式は y=□x で表される。□に入るのは？", options: ["速度","割合","比例定数","比"], answer: 3 },
+    { q: "xが2倍になるとyも2倍になるのは？", options: ["等差数列","反比例","比例","比例反比例"], answer: 3 },
+    { q: "比例のグラフはどんな形？", options: ["直線","曲線","折れ線","放物線"], answer: 1 },
+    { q: "比例のグラフは原点を通る？", options: ["通る","通らない","場合による","わからない"], answer: 1 },
+    { q: "y=3xのとき、x=4ならyは？", options: ["3","7","8","12"], answer: 4 }
+  ],
+  "11-2反比例の意味とグラフ": [
+    { q: "反比例の式は xy=□ で表される。□に入るのは？", options: ["速度","割合","定数","比"], answer: 3 },
+    { q: "xが2倍になるとyは？", options: ["半分になる","2倍になる","変わらない","4倍になる"], answer: 1 },
+    { q: "反比例のグラフはどんな形？", options: ["円","直線","放物線","双曲線"], answer: 4 },
+    { q: "y=12/x のとき、x=3ならyは？", options: ["4","3","12","6"], answer: 1 },
+    { q: "反比例のグラフは原点を通る？", options: ["通る","通らない","場合による","わからない"], answer: 2 }
+  ],
+  "12-1順列（並べ方）": [
+    { q: "3人を並べる順列は何通り？", options: ["3","6","9","12"], answer: 2 },
+    { q: "4人の順列は何通り？", options: ["8","12","26","24"], answer: 4 },
+    { q: "順列で順番を入れ替えると別の並びとみなす？", options: ["はい","いいえ","場合による","わからない"], answer: 1 },
+    { q: "4人から3人を並べるのは何通り？", options: ["10","16","20","24"], answer: 4 }
+  ],
+  "12-2組み合わせ": [
+    { q: "5人から2人を選ぶ組み合わせは何通り？", options: ["20","10","5","15"], answer: 2 },
+    { q: "組み合わせは順番を考える？", options: ["考えない","考える","場合による","わからない"], answer: 1 },
+    { q: "4人から3人を選ぶ組み合わせは何通り？", options: ["4","12","6","3"], answer: 3 },
+    { q: "6人から2人を選ぶ組み合わせは何通り？", options: ["12","20","10","15"], answer: 4 }
+  ],
+  "13-1総合問題（前半）": [
+    { q: "5×(2+3)の計算結果は？", options: ["25","20","10","15"], answer: 1 },
+    { q: "1/2×1/4は？", options: ["1/6","1/8","1/4","1/2"], answer: 2 },
+    { q: "3:4の比を分数で表すと？", options: ["3/4","4/3","7","1"], answer: 1 },
+    { q: "円の面積公式は？", options: ["半径×3.14","直径×3.14","半径×半径×3.14","半径×半径"], answer: 3 },
+    { q: "底辺10cm、高さ5cmの三角形の面積は？", options: ["50","25","20","15"], answer: 2 }
+  ],
+  "13-2総合問題（後半）": [
+    { q: "反比例のグラフの形は？", options: ["直線","放物線","双曲線","円"], answer: 3 },
+    { q: "3人から2人を選ぶ組み合わせは？", options: ["6","3","9","2"], answer: 2 },
+    { q: "2.8mを四捨五入して整数にすると？", options: ["3","2","4","5"], answer: 1 },
+    { q: "y=5xのときx=2ならyは？", options: ["7","8","12","10"], answer: 4 },
+    { q: "半径7cmの円周の長さは？(π=3.14)", options: ["43.96","49","21.98","50"], answer: 1 }
+  ]
+};
+
+/* ================== 定数・キー ================== */
+const teacherPassword = "sensei";
+const VERSION = "adventure_v1";
+let currentUser = null;
+
+/* ================== localStorage ヘルパ ================== */
+function keyUser(){ return `${VERSION}::user`; }
+function keySubProgress(sub){ return `${VERSION}::${currentUser}::sub::${sub}`; } // { correct:[], cursor:number, awarded:boolean }
+function keyCollection(){ return `${VERSION}::${currentUser}::collection`; }
+function keyClearedCount(){ return `${VERSION}::${currentUser}::clearedCount`; } // クリア済み小単元数（道の歩数）
+
+function saveUser(name){ localStorage.setItem(keyUser(), name); }
+function loadUser(){ return localStorage.getItem(keyUser()); }
+
+function getProgress(sub){
+  const raw = localStorage.getItem(keySubProgress(sub));
+  if(!raw) return { correct:[], cursor:0, awarded:false };
+  try{ const o = JSON.parse(raw); return { correct:o.correct||[], cursor:o.cursor||0, awarded:!!o.awarded }; }
+  catch{ return { correct:[], cursor:0, awarded:false }; }
+}
+function setProgress(sub, obj){
+  localStorage.setItem(keySubProgress(sub), JSON.stringify(obj));
+}
+
+function getCollection(){
+  try{ return JSON.parse(localStorage.getItem(keyCollection())||"[]"); }catch{return []}
+}
+function setCollection(arr){ localStorage.setItem(keyCollection(), JSON.stringify(arr)); }
+
+function getClearedCount(){
+  const n = Number(localStorage.getItem(keyClearedCount())||"0");
+  return isNaN(n)?0:n;
+}
+function setClearedCount(n){ localStorage.setItem(keyClearedCount(), String(n)); }
+
+/* ================== 報酬（被りありでランダム） ================== */
+function awardRandomCharacter(){
+  const col = getCollection();
+  const url = allCharacters[Math.floor(Math.random()*allCharacters.length)];
+  col.push(url); // 被りあり
+  setCollection(col);
+  return url;
+}
+
+/* ================== UI要素 ================== */
+const loginCard = document.getElementById('loginCard');
+const adventureCard = document.getElementById('adventureCard');
+const quizCard = document.getElementById('quizCard');
+const collectionCard = document.getElementById('collectionCard');
+const teacherCard = document.getElementById('teacherCard');
+
+const currentUserLabel = document.getElementById('currentUserLabel');
+const qCounter = document.getElementById('qCounter');
+const subunitTitle = document.getElementById('subunitTitle');
+const questionText = document.getElementById('questionText');
+const optionsDiv = document.getElementById('options');
+const feedback = document.getElementById('feedback');
+const progressText = document.getElementById('progressText');
+const progressBar = document.getElementById('progressBar');
+
+const pathDiv = document.getElementById('path');
+const hero = document.getElementById('hero');
+const clearedCountLabel = document.getElementById('clearedCount');
+const totalSubunitsLabel = document.getElementById('totalSubunits');
+
+/* ================== セレクト生成 ================== */
+const unitSelect = document.createElement('select');
+const subunitSelect = document.createElement('select');
+unitSelect.id = "unitSelect";
+subunitSelect.id = "subunitSelect";
+
+const quizHeaderControls = document.createElement('div');
+quizHeaderControls.className = "row";
+quizHeaderControls.style.margin = "0 0 8px";
+quizHeaderControls.innerHTML = `
+  <div style="flex:1">
+    <label class="small muted">単元</label>
+  </div>
+  <div style="flex:1">
+    <label class="small muted">小単元</label>
+  </div>
+`;
+quizHeaderControls.children[0].appendChild(unitSelect);
+quizHeaderControls.children[1].appendChild(subunitSelect);
+quizCard.insertBefore(quizHeaderControls, quizCard.children[1]);
+
+/* ================== 冒険パス構築 ================== */
+function buildUnitMap(){
+  const map = {};
+  Object.keys(units).forEach(key=>{
+    const unitNo = (key.split('-')[0]||"").trim();
+    map[unitNo] = map[unitNo] || [];
+    map[unitNo].push(key);
+  });
+  Object.keys(map).forEach(no=> map[no].sort((a,b)=> a.localeCompare(b,'ja')));
+  return map;
+}
+const unitMap = buildUnitMap();
+const subunitsOrdered = Object.keys(unitMap).sort((a,b)=>Number(a)-Number(b))
+  .flatMap(no => unitMap[no]);
+
+/* ================== 冒険パス描画 ================== */
+function renderAdventurePath(){
+  const total = subunitsOrdered.length;
+  totalSubunitsLabel.textContent = total;
+  pathDiv.innerHTML = "";
+  // ノード生成（小単元数分）
+  subunitsOrdered.forEach((name, idx)=>{
+    const node = document.createElement('div');
+    node.className = 'node';
+    node.dataset.sub = name;
+    // 単元の最初ノードにラベル
+    const isHead = unitMap[name.split('-')[0]].indexOf(name)===0;
+    if(isHead){
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = `単元 ${name.split('-')[0]}`;
+      node.appendChild(label);
+    }
+    // クリア済み表示
+    const pr = getProgress(name);
+    if(pr.awarded) node.classList.add('done','treasure');
+    pathDiv.appendChild(node);
+  });
+  updateHeroPosition(false);
+}
+
+/* ================== ヒーローの位置更新 ================== */
+function updateHeroPosition(animate=true){
+  const cleared = subunitsOrdered.filter(s => getProgress(s).awarded).length;
+  const total = subunitsOrdered.length;
+  clearedCountLabel.textContent = cleared;
+  const nodes = [...pathDiv.children];
+  nodes.forEach((n,i)=> n.classList.toggle('done', getProgress(n.dataset.sub).awarded));
+
+  // left%（0%〜100%）を均等に
+  const percent = (cleared<=0)? 0 : (cleared/total)*100;
+  if(!animate){ hero.style.transition = 'none'; }
+  hero.style.left = `calc(${percent}% - 8px)`;
+  if(!animate){ setTimeout(()=> hero.style.transition = '', 0); }
+}
+
+/* ================== セレクト（単元/小単元） ================== */
+function initSelectors(){
+  unitSelect.innerHTML = "";
+  Object.keys(unitMap).sort((a,b)=>Number(a)-Number(b)).forEach(no=>{
+    const opt = document.createElement('option');
+    opt.value = no; opt.textContent = `単元 ${no}`;
+    unitSelect.appendChild(opt);
+  });
+  unitSelect.addEventListener('change', refreshSubunits);
+
+  subunitSelect.addEventListener('change', ()=> renderQuestion(true));
+  refreshSubunits();
+}
+function refreshSubunits(){
+  const no = unitSelect.value;
+  const subs = unitMap[no] || [];
+  subunitSelect.innerHTML = "";
+  subs.forEach(s=>{
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    subunitSelect.appendChild(opt);
+  });
+  renderQuestion(true);
+}
+
+/* ================== 問題描画・解答処理 ================== */
+function getList(sub){ return units[sub]||[]; }
+
+function renderQuestion(resetCursor=false){
+  const sub = subunitSelect.value;
+  subunitTitle.textContent = sub||"-";
+  const data = getProgress(sub);
+  const list = getList(sub);
+  if(list.length===0){
+    qCounter.textContent = "0/0";
+    questionText.textContent = "この小単元には問題がありません。";
+    optionsDiv.innerHTML = ""; feedback.innerHTML="";
+    progressText.textContent = `0/0`; progressBar.style.width = "0%";
+    return;
+  }
+  if(resetCursor){
+    if(data.cursor<0 || data.cursor>=list.length) data.cursor = 0;
+    setProgress(sub, data);
+  }
+  const idx = data.cursor;
+  const item = list[idx];
+
+  qCounter.textContent = `${idx+1} / ${list.length}`;
+  questionText.textContent = item.q;
+  optionsDiv.innerHTML = "";
+  feedback.innerHTML = "";
+
+  // 進捗UI
+  progressText.textContent = `${data.correct.length}/${list.length}`;
+  progressBar.style.width = `${(data.correct.length/list.length)*100}%`;
+
+  item.options.forEach((op, i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.innerHTML = `<b>${i+1}.</b> ${op}`;
+    btn.addEventListener('click', ()=> onAnswer(i+1));
+    optionsDiv.appendChild(btn);
+  });
+}
+
+function moveQuestion(delta){
+  const sub = subunitSelect.value;
+  const data = getProgress(sub);
+  const list = getList(sub);
+  data.cursor += delta;
+  if(data.cursor < 0) data.cursor = list.length-1;
+  if(data.cursor >= list.length) data.cursor = 0;
+  setProgress(sub, data);
+  renderQuestion();
+}
+
+document.getElementById('prevQ').addEventListener('click', ()=>moveQuestion(-1));
+document.getElementById('nextQ').addEventListener('click', ()=>moveQuestion(1));
+
+function onAnswer(choice){
+  const sub = subunitSelect.value;
+  const data = getProgress(sub);
+  const list = getList(sub);
+  const idx = data.cursor;
+  const correctIdx = list[idx].answer;
+
+  // 装飾
+  [...optionsDiv.children].forEach((b,i)=>{
+    b.classList.remove('correct','wrong');
+    if(i+1===choice) b.classList.add(choice===correctIdx?'correct':'wrong');
+  });
+
+  if(choice === correctIdx){
+    // 初回正解なら記録
+    if(!data.correct.includes(idx)){
+      data.correct.push(idx);
+      setProgress(sub, data);
+      // 進捗UI更新
+      progressText.textContent = `${data.correct.length}/${list.length}`;
+      progressBar.style.width = `${(data.correct.length/list.length)*100}%`;
+      feedback.innerHTML = `<p style="color:var(--ok);font-weight:700">正解！</p>`;
+    }else{
+      feedback.innerHTML = `<p style="color:var(--ok);font-weight:700">正解！（この問題はクリア済み）</p>`;
+    }
+
+    // === 小単元コンプリート判定（全問正解）===
+    const completed = data.correct.length >= list.length;
+    if(completed && !data.awarded){
+      // クリア扱い：宝箱 → ランダムキャラ（被りあり）
+      data.awarded = true;
+      setProgress(sub, data);
+
+      // 歩数（踏破小単元数）を+1
+      const currentCleared = getClearedCount();
+      setClearedCount(currentCleared + 1);
+
+      // 宝箱開封
+      openTreasureModal(sub);
+      // 冒険パス更新＆ヒーロー移動
+      updateHeroPosition(true);
+      // ノードの宝箱印
+      const node = [...pathDiv.children].find(n=>n.dataset.sub===sub);
+      if(node) node.classList.add('treasure','done');
+    }
+  }else{
+    feedback.innerHTML = `<p style="color:var(--danger);font-weight:700">ざんねん！もう一度挑戦しよう</p>`;
+  }
+}
+
+/* ================== 宝箱モーダル ================== */
+const modalBackdrop = document.getElementById('modalBackdrop');
+const rewardImg = document.getElementById('rewardImg');
+const modalTitle = document.getElementById('modalTitle');
+const modalMessage = document.getElementById('modalMessage');
+const chestEmoji = document.getElementById('chestEmoji');
+document.getElementById('closeModalBtn').addEventListener('click', ()=> modalBackdrop.style.display='none');
+
+function openTreasureModal(sub){
+  const url = awardRandomCharacter();
+  rewardImg.src = url;
+  modalTitle.textContent = "宝箱が開いた！";
+  chestEmoji.textContent = "🧰";
+  modalMessage.textContent = `${sub} をクリア！ 新しいキャラクターを仲間にした！`;
+  modalBackdrop.style.display = 'flex';
+}
+
+/* ================== コレクション表示 ================== */
+function showCollection(){
+  const grid = document.getElementById('collectionGrid');
+  grid.innerHTML = "";
+  const col = getCollection();
+  if(col.length===0){
+    grid.innerHTML = `<p class="muted">まだキャラクターを持っていません。</p>`;
+  }else{
+    col.forEach(url=>{
+      const img = document.createElement('img');
+      img.src = url; grid.appendChild(img);
+    });
+  }
+  collectionCard.style.display = "block";
+}
+document.getElementById('showCollectionBtn').addEventListener('click', showCollection);
+document.getElementById('hideCollectionBtn').addEventListener('click', ()=> collectionCard.style.display="none");
+
+/* ================== 教師モード ================== */
+document.getElementById('teacherBtn').addEventListener('click', ()=>{
+  const pw = prompt("教師モードパスワードを入力してください");
+  if(pw === teacherPassword){
+    teacherCard.style.display = "block";
+  }else if(pw !== null){
+    alert("パスワードが違います");
+  }
+});
+document.getElementById('switchUserBtn').addEventListener('click', ()=>{
+  const name = prompt("切り替えるユーザー名（ニックネーム）を入力");
+  if(name && name.trim()){
+    currentUser = name.trim();
+    saveUser(currentUser);
+    startApp();
+    alert(`ユーザーを「${currentUser}」に切り替えました`);
+  }
+});
+document.getElementById('wipeBtn').addEventListener('click', ()=>{
+  if(!confirm(`${currentUser} の全データ（進捗・コレクション・踏破）を削除します。よろしいですか？`)) return;
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith(`${VERSION}::${currentUser}::`)){
+      localStorage.removeItem(k);
+    }
+  });
+  startApp();
+  alert("削除しました");
+});
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const dump = {};
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith(`${VERSION}::${currentUser}::`)){
+      dump[k] = localStorage.getItem(k);
+    }
+  });
+  const pre = document.getElementById('exportBox');
+  pre.textContent = JSON.stringify(dump, null, 2);
+  pre.style.display = "block";
+});
+
+/* ================== ログイン・起動 ================== */
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const name = (document.getElementById('nickname').value || "").trim();
+  if(!name){ alert("ニックネームを入力してください"); return; }
+  currentUser = name;
+  saveUser(name);
+  startApp();
+});
+
+function startApp(){
+  loginCard.style.display = "none";
+  adventureCard.style.display = "block";
+  quizCard.style.display = "block";
+  collectionCard.style.display = "none";
+  teacherCard.style.display = "none";
+  currentUserLabel.textContent = currentUser;
+
+  // 初回に踏破数を再計算（データ互換）
+  const awardedCount = subunitsOrdered.filter(s => getProgress(s).awarded).length;
+  setClearedCount(awardedCount);
+
+  // 冒険道＆ヒーロー
+  renderAdventurePath();
+
+  // セレクタ
+  initSelectors();
+}
+
+(function boot(){
+  const saved = loadUser();
+  if(saved){
+    currentUser = saved;
+    startApp();
+  }else{
+    loginCard.style.display = "block";
+  }
+})();
+</script>
+</body>
+</html>
